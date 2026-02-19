@@ -107,6 +107,7 @@ RESOLUTION_MAP = {
 @dataclass
 class BatchJob:
     """Represents a single job in the batch."""
+
     prompt: str
     output_name: str
     image_path: Optional[str] = None
@@ -117,12 +118,12 @@ class BatchJob:
     seed: Optional[int] = None
     width: Optional[int] = None
     height: Optional[int] = None
-    
+
     # Internal fields
     line_number: int = 0
     status: str = "pending"
     error: Optional[str] = None
-    
+
     @classmethod
     def from_dict(cls, data: Dict[str, Any], line_number: int = 0) -> "BatchJob":
         """Create a BatchJob from a dictionary."""
@@ -139,7 +140,7 @@ class BatchJob:
             height=data.get("height"),
             line_number=line_number,
         )
-    
+
     def validate(self) -> List[str]:
         """Validate the job and return list of errors."""
         errors = []
@@ -153,6 +154,7 @@ class BatchJob:
 @dataclass
 class BatchState:
     """Tracks batch progress for resume capability."""
+
     batch_file: str
     output_dir: str
     model_path: str
@@ -161,7 +163,7 @@ class BatchState:
     failed: List[Dict[str, str]] = field(default_factory=list)
     started_at: str = ""
     updated_at: str = ""
-    
+
     @classmethod
     def load(cls, state_file: Path) -> Optional["BatchState"]:
         """Load state from file."""
@@ -174,22 +176,22 @@ class BatchState:
         except Exception as e:
             logger.warning(f"Failed to load state file: {e}")
             return None
-    
+
     def save(self, state_file: Path):
         """Save state to file."""
         self.updated_at = datetime.now().isoformat()
         with open(state_file, "w") as f:
             json.dump(self.__dict__, f, indent=2)
-    
+
     def mark_completed(self, output_name: str):
         """Mark a job as completed."""
         if output_name not in self.completed:
             self.completed.append(output_name)
-    
+
     def mark_failed(self, output_name: str, error: str):
         """Mark a job as failed."""
         self.failed.append({"output_name": output_name, "error": error})
-    
+
     def is_completed(self, output_name: str) -> bool:
         """Check if a job was already completed."""
         return output_name in self.completed
@@ -198,37 +200,37 @@ class BatchState:
 def load_batch_file(batch_file: Path) -> List[BatchJob]:
     """
     Load and parse a JSONL batch file.
-    
+
     Args:
         batch_file: Path to the JSONL file
-        
+
     Returns:
         List of BatchJob objects
     """
     jobs = []
-    
+
     with open(batch_file, "r") as f:
         for line_num, line in enumerate(f, 1):
             line = line.strip()
             if not line or line.startswith("#"):
                 continue
-            
+
             try:
                 data = json.loads(line)
                 job = BatchJob.from_dict(data, line_number=line_num)
-                
+
                 # Validate job
                 errors = job.validate()
                 if errors:
                     logger.warning(f"Line {line_num}: Invalid job - {', '.join(errors)}")
                     continue
-                
+
                 jobs.append(job)
-                
+
             except json.JSONDecodeError as e:
                 logger.warning(f"Line {line_num}: Invalid JSON - {e}")
                 continue
-    
+
     return jobs
 
 
@@ -241,26 +243,26 @@ def load_pipeline(
 ):
     """
     Load the appropriate pipeline for the generation type.
-    
+
     Args:
         model_path: Path to the model
         generate_type: Type of generation (t2v, i2v, v2v)
         dtype: Data type for computation
         lora_path: Optional path to LoRA weights
         enable_cpu_offload: Whether to enable CPU offloading
-        
+
     Returns:
         The loaded pipeline
     """
     logger.info(f"Loading pipeline for {generate_type} from {model_path}")
-    
+
     if generate_type == "i2v":
         pipe = CogVideoXImageToVideoPipeline.from_pretrained(model_path, torch_dtype=dtype)
     elif generate_type == "t2v":
         pipe = CogVideoXPipeline.from_pretrained(model_path, torch_dtype=dtype)
     else:  # v2v
         pipe = CogVideoXVideoToVideoPipeline.from_pretrained(model_path, torch_dtype=dtype)
-    
+
     # Load LoRA weights if provided
     if lora_path:
         logger.info(f"Loading LoRA weights from {lora_path}")
@@ -268,21 +270,21 @@ def load_pipeline(
             lora_path, weight_name="pytorch_lora_weights.safetensors", adapter_name="batch_lora"
         )
         pipe.fuse_lora(components=["transformer"], lora_scale=1.0)
-    
+
     # Set scheduler
     pipe.scheduler = CogVideoXDPMScheduler.from_config(
         pipe.scheduler.config, timestep_spacing="trailing"
     )
-    
+
     # Enable memory optimizations
     if enable_cpu_offload:
         pipe.enable_sequential_cpu_offload()
     else:
         pipe.to("cuda")
-    
+
     pipe.vae.enable_slicing()
     pipe.vae.enable_tiling()
-    
+
     logger.info("Pipeline loaded successfully")
     return pipe
 
@@ -301,7 +303,7 @@ def generate_single_video(
 ):
     """
     Generate a single video from a job.
-    
+
     Args:
         pipe: The loaded pipeline
         job: The batch job to process
@@ -315,17 +317,17 @@ def generate_single_video(
     desired_resolution = RESOLUTION_MAP.get(model_name.lower(), (480, 720))
     height = job.height if job.height else desired_resolution[0]
     width = job.width if job.width else desired_resolution[1]
-    
+
     # Use job-specific or default values
     num_frames = job.num_frames or default_num_frames
     guidance_scale = job.guidance_scale or default_guidance_scale
     num_inference_steps = job.num_inference_steps or default_num_inference_steps
     seed = job.seed or default_seed
-    
+
     # Load image/video if needed
     image = None
     video = None
-    
+
     if generate_type == "i2v":
         if not job.image_path:
             raise ValueError("image_path is required for i2v generation")
@@ -334,10 +336,10 @@ def generate_single_video(
         if not job.video_path:
             raise ValueError("video_path is required for v2v generation")
         video = load_video(job.video_path)
-    
+
     # Generate video
     generator = torch.Generator().manual_seed(seed)
-    
+
     if generate_type == "i2v":
         video_frames = pipe(
             height=height,
@@ -376,7 +378,7 @@ def generate_single_video(
             guidance_scale=guidance_scale,
             generator=generator,
         ).frames[0]
-    
+
     # Export video
     export_to_video(video_frames, str(output_path), fps=fps)
 
@@ -400,7 +402,7 @@ def run_batch(
 ) -> Dict[str, Any]:
     """
     Run batch inference on a JSONL file.
-    
+
     Args:
         batch_file: Path to the JSONL batch file
         model_path: Path to the model
@@ -414,7 +416,7 @@ def run_batch(
         num_gpus: Total number of GPUs for distribution
         default_*: Default values for optional parameters
         fps: Frames per second for output videos
-        
+
     Returns:
         Summary dictionary with statistics
     """
@@ -422,26 +424,26 @@ def run_batch(
     output_dir.mkdir(parents=True, exist_ok=True)
     state_file = output_dir / ".batch_state.json"
     error_log = output_dir / "errors.log"
-    
+
     # Load jobs
     logger.info(f"Loading batch file: {batch_file}")
     all_jobs = load_batch_file(batch_file)
     logger.info(f"Found {len(all_jobs)} valid jobs in batch file")
-    
+
     # Distribute jobs across GPUs if using multi-GPU
     if num_gpus > 1:
         jobs = [j for i, j in enumerate(all_jobs) if i % num_gpus == gpu_id]
         logger.info(f"GPU {gpu_id}/{num_gpus}: Processing {len(jobs)} jobs")
     else:
         jobs = all_jobs
-    
+
     # Load or create state
     state = None
     if resume:
         state = BatchState.load(state_file)
         if state:
             logger.info(f"Resuming batch: {len(state.completed)} already completed")
-    
+
     if state is None:
         state = BatchState(
             batch_file=str(batch_file),
@@ -450,7 +452,7 @@ def run_batch(
             generate_type=generate_type,
             started_at=datetime.now().isoformat(),
         )
-    
+
     # Filter out completed jobs
     if resume:
         pending_jobs = [j for j in jobs if not state.is_completed(j.output_name)]
@@ -458,11 +460,11 @@ def run_batch(
         if skipped > 0:
             logger.info(f"Skipping {skipped} already-completed jobs")
         jobs = pending_jobs
-    
+
     if not jobs:
         logger.info("No jobs to process")
         return {"total": 0, "completed": 0, "failed": 0, "skipped": len(all_jobs)}
-    
+
     # Load pipeline
     model_name = model_path.split("/")[-1]
     pipe = load_pipeline(
@@ -472,19 +474,19 @@ def run_batch(
         lora_path=lora_path,
         enable_cpu_offload=enable_cpu_offload,
     )
-    
+
     # Process jobs
     completed = 0
     failed = 0
     start_time = time.time()
-    
+
     with tqdm(total=len(jobs), desc="Generating videos", unit="video") as pbar:
         for job in jobs:
             output_path = output_dir / job.output_name
-            
+
             try:
                 logger.info(f"Processing: {job.output_name} - \"{job.prompt[:50]}...\"")
-                
+
                 generate_single_video(
                     pipe=pipe,
                     job=job,
@@ -497,15 +499,15 @@ def run_batch(
                     default_seed=default_seed,
                     fps=fps,
                 )
-                
+
                 state.mark_completed(job.output_name)
                 completed += 1
                 logger.info(f"Completed: {job.output_name}")
-                
+
             except Exception as e:
                 error_msg = f"{type(e).__name__}: {str(e)}"
                 logger.error(f"Failed: {job.output_name} - {error_msg}")
-                
+
                 # Log full traceback to error log
                 with open(error_log, "a") as f:
                     f.write(f"\n{'='*60}\n")
@@ -514,26 +516,24 @@ def run_batch(
                     f.write(f"Time: {datetime.now().isoformat()}\n")
                     f.write(f"Error: {error_msg}\n")
                     f.write(traceback.format_exc())
-                
+
                 state.mark_failed(job.output_name, error_msg)
                 failed += 1
-            
+
             # Save state after each job (for resume)
             state.save(state_file)
             pbar.update(1)
-            
+
             # Update ETA in progress bar
             elapsed = time.time() - start_time
             if completed + failed > 0:
                 avg_time = elapsed / (completed + failed)
                 remaining = len(jobs) - (completed + failed)
                 eta_seconds = avg_time * remaining
-                pbar.set_postfix({
-                    "done": completed,
-                    "failed": failed,
-                    "ETA": f"{eta_seconds/60:.1f}m"
-                })
-    
+                pbar.set_postfix(
+                    {"done": completed, "failed": failed, "ETA": f"{eta_seconds/60:.1f}m"}
+                )
+
     # Final summary
     elapsed_total = time.time() - start_time
     summary = {
@@ -544,7 +544,7 @@ def run_batch(
         "elapsed_seconds": elapsed_total,
         "avg_seconds_per_video": elapsed_total / max(completed + failed, 1),
     }
-    
+
     logger.info("=" * 60)
     logger.info("BATCH COMPLETE")
     logger.info(f"  Total jobs: {summary['total']}")
@@ -554,7 +554,7 @@ def run_batch(
     if summary['failed'] > 0:
         logger.info(f"  See errors in: {error_log}")
     logger.info("=" * 60)
-    
+
     return summary
 
 
@@ -566,11 +566,11 @@ def main():
 Examples:
   # Basic text-to-video batch
   python batch_inference.py --batch_file prompts.jsonl --model_path THUDM/CogVideoX1.5-5B
-  
+
   # Image-to-video batch with custom output directory
   python batch_inference.py --batch_file i2v.jsonl --model_path THUDM/CogVideoX1.5-5B-I2V \\
       --generate_type i2v --output_dir ./my_videos
-  
+
   # Multi-GPU: run on 4 GPUs (one process per GPU)
   for i in {0..3}; do
       CUDA_VISIBLE_DEVICES=$i python batch_inference.py --batch_file batch.jsonl \\
@@ -579,128 +579,91 @@ Examples:
 
 JSONL Format:
   Each line is a JSON object with: prompt (required), output_name (required),
-  and optional: image_path, video_path, num_frames, guidance_scale, 
+  and optional: image_path, video_path, num_frames, guidance_scale,
   num_inference_steps, seed, width, height
-        """
+        """,
     )
-    
+
     # Required arguments
-    parser.add_argument(
-        "--batch_file",
-        type=str,
-        required=True,
-        help="Path to JSONL batch file"
-    )
+    parser.add_argument("--batch_file", type=str, required=True, help="Path to JSONL batch file")
     parser.add_argument(
         "--model_path",
         type=str,
         default="THUDM/CogVideoX1.5-5B",
-        help="Path to the model (default: THUDM/CogVideoX1.5-5B)"
+        help="Path to the model (default: THUDM/CogVideoX1.5-5B)",
     )
-    
+
     # Output settings
     parser.add_argument(
         "--output_dir",
         type=str,
         default="./batch_output",
-        help="Directory for output videos (default: ./batch_output)"
+        help="Directory for output videos (default: ./batch_output)",
     )
     parser.add_argument(
         "--generate_type",
         type=str,
         choices=["t2v", "i2v", "v2v"],
         default="t2v",
-        help="Generation type (default: t2v)"
+        help="Generation type (default: t2v)",
     )
-    
+
     # Model settings
     parser.add_argument(
-        "--lora_path",
-        type=str,
-        default=None,
-        help="Path to LoRA weights (optional)"
+        "--lora_path", type=str, default=None, help="Path to LoRA weights (optional)"
     )
     parser.add_argument(
         "--dtype",
         type=str,
         choices=["float16", "bfloat16"],
         default="bfloat16",
-        help="Data type for computation (default: bfloat16)"
+        help="Data type for computation (default: bfloat16)",
     )
     parser.add_argument(
         "--disable_cpu_offload",
         action="store_true",
-        help="Disable CPU offloading (uses more VRAM but faster)"
+        help="Disable CPU offloading (uses more VRAM but faster)",
     )
-    
+
     # Default generation parameters
     parser.add_argument(
-        "--num_frames",
-        type=int,
-        default=81,
-        help="Default number of frames (default: 81)"
+        "--num_frames", type=int, default=81, help="Default number of frames (default: 81)"
     )
     parser.add_argument(
-        "--guidance_scale",
-        type=float,
-        default=6.0,
-        help="Default guidance scale (default: 6.0)"
+        "--guidance_scale", type=float, default=6.0, help="Default guidance scale (default: 6.0)"
     )
     parser.add_argument(
-        "--num_inference_steps",
-        type=int,
-        default=50,
-        help="Default inference steps (default: 50)"
+        "--num_inference_steps", type=int, default=50, help="Default inference steps (default: 50)"
     )
-    parser.add_argument(
-        "--seed",
-        type=int,
-        default=42,
-        help="Default random seed (default: 42)"
-    )
-    parser.add_argument(
-        "--fps",
-        type=int,
-        default=16,
-        help="Output video FPS (default: 16)"
-    )
-    
+    parser.add_argument("--seed", type=int, default=42, help="Default random seed (default: 42)")
+    parser.add_argument("--fps", type=int, default=16, help="Output video FPS (default: 16)")
+
     # Resume and multi-GPU
     parser.add_argument(
         "--resume",
         action="store_true",
         default=True,
-        help="Resume from previous state (default: True)"
+        help="Resume from previous state (default: True)",
+    )
+    parser.add_argument("--no_resume", action="store_true", help="Don't resume, start fresh")
+    parser.add_argument(
+        "--gpu_id", type=int, default=0, help="GPU ID for multi-GPU distribution (default: 0)"
     )
     parser.add_argument(
-        "--no_resume",
-        action="store_true",
-        help="Don't resume, start fresh"
+        "--num_gpus", type=int, default=1, help="Total number of GPUs for distribution (default: 1)"
     )
-    parser.add_argument(
-        "--gpu_id",
-        type=int,
-        default=0,
-        help="GPU ID for multi-GPU distribution (default: 0)"
-    )
-    parser.add_argument(
-        "--num_gpus",
-        type=int,
-        default=1,
-        help="Total number of GPUs for distribution (default: 1)"
-    )
-    
+
     args = parser.parse_args()
-    
+
     # Validate batch file exists
     batch_file = Path(args.batch_file)
     if not batch_file.exists():
         logger.error(f"Batch file not found: {batch_file}")
         sys.exit(1)
-    
+
     # Parse dtype
     dtype = torch.float16 if args.dtype == "float16" else torch.bfloat16
-    
+
     # Run batch
     try:
         summary = run_batch(
@@ -720,11 +683,11 @@ JSONL Format:
             default_seed=args.seed,
             fps=args.fps,
         )
-        
+
         # Exit with error code if any failures
         if summary["failed"] > 0:
             sys.exit(1)
-            
+
     except KeyboardInterrupt:
         logger.info("\nBatch interrupted by user. Progress saved for resume.")
         sys.exit(130)
