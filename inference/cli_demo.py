@@ -96,7 +96,17 @@ def generate_video(
     video = None
 
     model_name = model_path.split("/")[-1].lower()
-    desired_resolution = RESOLUTION_MAP[model_name]
+    try:
+        desired_resolution = RESOLUTION_MAP[model_name]
+    except KeyError:
+        valid_models = ", ".join(RESOLUTION_MAP.keys())
+        default_resolution = (480, 720)
+        logging.warning(
+            f"\033[1;33mModel '{model_name}' not found in resolution map. "
+            f"Valid models: {valid_models}. "
+            f"Falling back to default resolution {default_resolution}.\033[0m"
+        )
+        desired_resolution = default_resolution
     if width is None or height is None:
         height, width = desired_resolution
         logging.info(
