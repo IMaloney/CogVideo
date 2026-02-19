@@ -8,6 +8,8 @@ logs/
 .idea
 output*
 test*
+!tests/
+!tests/**
 venv
 **/.swp
 **/*.log
