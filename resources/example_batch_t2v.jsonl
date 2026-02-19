@@ -1,0 +1,12 @@
+# Example text-to-video batch file
+# Each line is a JSON object with prompt and output_name (required)
+# Optional: num_frames, guidance_scale, num_inference_steps, seed, width, height
+
+{"prompt": "A majestic eagle soaring through golden sunset clouds, cinematic lighting, 4K quality", "output_name": "eagle_sunset.mp4"}
+{"prompt": "A cozy coffee shop on a rainy day, steam rising from cups, warm ambient lighting", "output_name": "coffee_shop_rain.mp4", "num_frames": 49}
+{"prompt": "An astronaut floating in space with Earth visible in the background, peaceful and serene", "output_name": "astronaut_space.mp4", "seed": 123}
+{"prompt": "A field of sunflowers swaying gently in the summer breeze, bright and cheerful", "output_name": "sunflowers.mp4", "guidance_scale": 7.0}
+{"prompt": "A futuristic city at night with neon lights and flying cars, cyberpunk aesthetic", "output_name": "cyberpunk_city.mp4", "num_inference_steps": 60}
+{"prompt": "A serene Japanese garden with cherry blossoms falling, koi pond, peaceful atmosphere", "output_name": "japanese_garden.mp4"}
+{"prompt": "Waves crashing on a tropical beach at sunset, palm trees silhouetted against orange sky", "output_name": "tropical_sunset.mp4"}
+{"prompt": "A mystical forest with glowing mushrooms and fireflies, fantasy atmosphere", "output_name": "mystical_forest.mp4", "seed": 456}

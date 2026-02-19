@@ -1,0 +1,8 @@
+# Example image-to-video batch file
+# For i2v generation, include image_path pointing to your input images
+# Run with: python tools/batch_inference.py --batch_file resources/example_batch_i2v.jsonl --model_path THUDM/CogVideoX1.5-5B-I2V --generate_type i2v
+
+{"prompt": "The person in the image starts walking forward with a confident stride", "output_name": "person_walking.mp4", "image_path": "./input_images/person.jpg"}
+{"prompt": "The landscape transforms with clouds moving across the sky and grass swaying", "output_name": "landscape_motion.mp4", "image_path": "./input_images/landscape.jpg", "num_frames": 81}
+{"prompt": "Zoom in slowly on the subject while adding subtle motion blur", "output_name": "zoom_effect.mp4", "image_path": "./input_images/portrait.jpg", "guidance_scale": 5.0}
+{"prompt": "The still life scene comes alive with gentle movement and shifting shadows", "output_name": "still_life_animated.mp4", "image_path": "./input_images/still_life.jpg"}

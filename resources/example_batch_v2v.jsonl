@@ -1,0 +1,8 @@
+# Example video-to-video batch file
+# For v2v generation, include video_path pointing to your input videos
+# Run with: python tools/batch_inference.py --batch_file resources/example_batch_v2v.jsonl --model_path THUDM/CogVideoX1.5-5B --generate_type v2v
+
+{"prompt": "Transform this video into a watercolor painting style with soft brushstrokes", "output_name": "watercolor_style.mp4", "video_path": "./input_videos/original1.mp4"}
+{"prompt": "Convert to anime style with vibrant colors and dramatic lighting", "output_name": "anime_style.mp4", "video_path": "./input_videos/original2.mp4", "guidance_scale": 7.5}
+{"prompt": "Add cinematic color grading with film grain and dramatic contrast", "output_name": "cinematic_grade.mp4", "video_path": "./input_videos/original3.mp4", "num_inference_steps": 40}
+{"prompt": "Transform into a vintage black and white film with classic aesthetics", "output_name": "vintage_bw.mp4", "video_path": "./input_videos/original4.mp4"}
