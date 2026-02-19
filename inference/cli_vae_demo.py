@@ -143,7 +143,7 @@ if __name__ == "__main__":
         encoded_output = encode_video(args.model_path, args.video_path, dtype, device)
         torch.save(encoded_output, args.output_path + "/encoded.pt")
         print(
-            f"Finished encoding the video to a tensor, save it to a file at {encoded_output}/encoded.pt"
+            f"Finished encoding the video to a tensor, saved to {args.output_path}/encoded.pt"
         )
     elif args.mode == "decode":
         assert args.encoded_path, "Encoded tensor path must be provided for decoding."
